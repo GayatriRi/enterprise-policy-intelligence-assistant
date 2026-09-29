@@ -5,7 +5,7 @@ from src.ingestion.chunker import split_documents
 from src.retrieval.vector_store import build_vector_store
 from src.retrieval.retriever import retrieve_documents
 from src.generation.rag import generate_answer
-
+from src.agents.workflow import run_agent_workflow
 
 
 st.set_page_config(
@@ -33,56 +33,67 @@ uploaded_files = st.file_uploader(
 if uploaded_files:
     st.success(f"{len(uploaded_files)} file(s) selected successfully.")
 
-    for uploaded_file in uploaded_files:
-        try:
-            documents = load_document(uploaded_file)
-            chunks = split_documents(documents)
-            vector_store = build_vector_store(chunks)
+for uploaded_file in uploaded_files:
+    try:
+        documents = load_document(uploaded_file)
+        chunks = split_documents(documents)
+        vector_store = build_vector_store(chunks)
 
-            st.write(f"✅ **{uploaded_file.name}**")
-            st.write(f"Loaded {len(documents)} document section(s).")
-            st.write(f"Created {len(chunks)} text chunk(s).")
-            st.success("FAISS vector store created successfully.")
+        st.write(f"✅ **{uploaded_file.name}**")
+        st.write(f"Loaded {len(documents)} document section(s).")
+        st.write(f"Created {len(chunks)} text chunk(s).")
+        st.success("FAISS vector store created successfully.")
 
-            with st.expander(f"Preview: {uploaded_file.name}"):
-                if chunks:
-                    preview = chunks[0].page_content[:1000]
-                    st.text(preview)
+        with st.expander(f"Preview: {uploaded_file.name}"):
+            if chunks:
+                preview = chunks[0].page_content[:1000]
+                st.text(preview)
 
-            st.divider()
+        st.divider()
 
-            st.subheader("Ask a Question")
+        st.subheader("Ask a Question")
 
-            query = st.text_input(
-                "Enter a question about the uploaded document:",
-                key=f"query_{uploaded_file.name}",
+        query = st.text_input(
+            "Enter a question about the uploaded document:",
+            key=f"query_{uploaded_file.name}",
+        )
+
+        if query:
+            workflow_result = run_agent_workflow(
+                vector_store,
+                query,
             )
 
-            if query:
-                results = retrieve_documents(
-                    vector_store,
-                    query,
-                    k=3,
-                )
-                answer = generate_answer(query, results)
+            answer = workflow_result["answer"]
+            documents = workflow_result["documents"]
+            validation = workflow_result["validation"]
+            plan = workflow_result["plan"]
 
-                st.write("### AI Answer")
-                st.write(answer)
+            st.write("### Agent Plan")
+            for step in plan["steps"]:
+                st.write(f"- {step}")
 
-                st.write("### Retrieved Evidence")
+            st.write("### AI Answer")
+            st.write(answer)
 
-                for index, result in enumerate(results, start=1):
-                    with st.expander(f"Result {index}"):
-                        st.write(result.page_content)
+            st.write("### Validation")
+            if validation["is_valid"]:
+                st.success(validation["message"])
+            else:
+                st.error(validation["message"])
 
-        except Exception as error:
-            st.error(
-                f"Could not process {uploaded_file.name}: {error}"
-            )
+            st.write("### Retrieved Evidence")
+
+            for index, result in enumerate(documents, start=1):
+                with st.expander(f"Result {index}"):
+                    st.write(result.page_content)
+
+    except Exception as error:
+        st.error(
+            f"Could not process {uploaded_file.name}: {error}"
+        )
 
 else:
     st.info(
         "Upload one or more enterprise documents to begin."
     )
-    
-  
