@@ -2,7 +2,11 @@ from src.agents.planner import create_plan
 from src.agents.retriever_agent import retrieve_context
 from src.agents.reasoner_agent import reason_over_context
 from src.agents.validator_agent import validate_answer
-
+from src.evaluation.metrics import (
+    evaluate_retrieval,
+    evaluate_answer,
+    evaluate_hallucination,
+)
 
 def run_agent_workflow(vector_store, query):
     """
@@ -27,10 +31,18 @@ def run_agent_workflow(vector_store, query):
         answer,
         documents,
     )
-
+    retrieval_evaluation = evaluate_retrieval(documents)
+    answer_evaluation = evaluate_answer(answer)
+    hallucination_evaluation = evaluate_hallucination(
+    answer,
+    documents,
+) 
     return {
         "plan": plan,
         "documents": documents,
         "answer": answer,
         "validation": validation,
+        "retrieval_evaluation": retrieval_evaluation,
+        "answer_evaluation": answer_evaluation,
+        "hallucination_evaluation": hallucination_evaluation,
     }
