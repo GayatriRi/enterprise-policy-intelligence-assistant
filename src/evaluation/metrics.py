@@ -76,3 +76,46 @@ def evaluate_hallucination(answer, documents):
         "hallucination_detected": True,
         "message": "Answer may contain information not supported by the retrieved evidence.",
     }
+def evaluate_answer_quality(answer, documents):
+    """
+    Basic answer-quality score based on grounding.
+    Returns a score from 0 to 100.
+    """
+
+    if not answer or not documents:
+        return {
+            "score": 0,
+            "message": "Answer quality could not be evaluated.",
+        }
+
+    context = " ".join(
+        document.page_content.lower()
+        for document in documents
+    )
+
+    answer_words = [
+        word.strip(".,!?")
+        for word in answer.lower().split()
+        if len(word.strip(".,!?")) > 4
+    ]
+
+    if not answer_words:
+        return {
+            "score": 0,
+            "message": "Answer did not contain enough meaningful content.",
+        }
+
+    supported_words = [
+        word
+        for word in answer_words
+        if word in context
+    ]
+
+    grounding_ratio = len(supported_words) / len(answer_words)
+
+    score = round(grounding_ratio * 100)
+
+    return {
+        "score": score,
+        "message": f"Answer quality score: {score}/100",
+    }

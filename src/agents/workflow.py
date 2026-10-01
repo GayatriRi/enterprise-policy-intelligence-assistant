@@ -6,6 +6,7 @@ from src.evaluation.metrics import (
     evaluate_retrieval,
     evaluate_answer,
     evaluate_hallucination,
+    evaluate_answer_quality,
 )
 
 def run_agent_workflow(vector_store, query):
@@ -37,6 +38,10 @@ def run_agent_workflow(vector_store, query):
     answer,
     documents,
 ) 
+    answer_quality_evaluation = evaluate_answer_quality(
+    answer,
+    documents,
+)
     return {
         "plan": plan,
         "documents": documents,
@@ -45,4 +50,5 @@ def run_agent_workflow(vector_store, query):
         "retrieval_evaluation": retrieval_evaluation,
         "answer_evaluation": answer_evaluation,
         "hallucination_evaluation": hallucination_evaluation,
+        "answer_quality_evaluation": answer_quality_evaluation,
     }

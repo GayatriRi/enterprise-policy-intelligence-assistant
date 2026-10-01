@@ -77,6 +77,7 @@ if uploaded_files:
                     retrieval_evaluation = workflow_result["retrieval_evaluation"]
                     answer_evaluation = workflow_result["answer_evaluation"]
                     hallucination_evaluation = workflow_result["hallucination_evaluation"]
+                    answer_quality_evaluation = workflow_result["answer_quality_evaluation"]
                     st.write("### Agent Plan")
 
                     for step in plan["steps"]:
@@ -102,7 +103,10 @@ if uploaded_files:
          )    
                     st.write(
                          f"Hallucination Check: {hallucination_evaluation['message']}"
- )
+    )
+                    st.write(
+                         f"Answer Quality: {answer_quality_evaluation['message']}"
+         )
                     st.write("### Retrieved Evidence")
 
                     for index, result in enumerate(documents, start=1):
