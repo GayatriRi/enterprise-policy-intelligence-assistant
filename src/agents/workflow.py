@@ -7,6 +7,7 @@ from src.evaluation.metrics import (
     evaluate_answer,
     evaluate_hallucination,
     evaluate_answer_quality,
+    evaluate_rouge,
 )
 
 def run_agent_workflow(vector_store, query):
@@ -42,6 +43,10 @@ def run_agent_workflow(vector_store, query):
     answer,
     documents,
 )
+    rouge_evaluation = evaluate_rouge(
+        answer,
+        documents,
+    )
     return {
         "plan": plan,
         "documents": documents,
@@ -51,4 +56,5 @@ def run_agent_workflow(vector_store, query):
         "answer_evaluation": answer_evaluation,
         "hallucination_evaluation": hallucination_evaluation,
         "answer_quality_evaluation": answer_quality_evaluation,
+        "rouge_evaluation": rouge_evaluation,
     }

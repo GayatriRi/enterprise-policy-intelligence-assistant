@@ -1,3 +1,4 @@
+from rouge_score import rouge_scorer
 def evaluate_retrieval(documents):
     """
     Basic retrieval evaluation.
@@ -118,4 +119,37 @@ def evaluate_answer_quality(answer, documents):
     return {
         "score": score,
         "message": f"Answer quality score: {score}/100",
+    }
+def evaluate_rouge(answer, documents):
+    """
+    Calculate ROUGE-L between the generated answer
+    and the retrieved document content.
+    """
+
+    if not answer or not documents:
+        return {
+            "rouge_l": 0.0,
+            "message": "ROUGE score could not be calculated.",
+        }
+
+    reference_text = " ".join(
+        document.page_content
+        for document in documents
+    )
+
+    scorer = rouge_scorer.RougeScorer(
+        ["rougeL"],
+        use_stemmer=True,
+    )
+
+    scores = scorer.score(
+        reference_text,
+        answer,
+    )
+
+    rouge_l = round(scores["rougeL"].fmeasure, 3)
+
+    return {
+        "rouge_l": rouge_l,
+        "message": f"ROUGE-L score: {rouge_l}",
     }
