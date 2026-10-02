@@ -55,6 +55,11 @@ def evaluate_hallucination(answer, documents):
     )
 
     answer_text = answer.lower()
+    if answer_text.strip(".,!?$ ") in context:
+       return {
+        "hallucination_detected": False,
+        "message": "Answer appears grounded in the retrieved evidence.",
+    }
 
     important_words = [
         word
@@ -77,7 +82,7 @@ def evaluate_hallucination(answer, documents):
     return {
         "hallucination_detected": True,
         "message": "Answer may contain information not supported by the retrieved evidence.",
-    }
+    } 
 def evaluate_answer_quality(answer, documents):
     """
     Basic answer-quality score based on grounding.
@@ -95,6 +100,8 @@ def evaluate_answer_quality(answer, documents):
         for document in documents
     )
 
+    normalized_answer = answer.lower().strip(".,!?$ ")
+
     answer_words = [
         word.strip(".,!?")
         for word in answer.lower().split()
@@ -102,6 +109,12 @@ def evaluate_answer_quality(answer, documents):
     ]
 
     if not answer_words:
+        if normalized_answer and normalized_answer in context:
+            return {
+                "score": 100,
+                "message": "Answer quality score: 100/100",
+            }
+
         return {
             "score": 0,
             "message": "Answer did not contain enough meaningful content.",
@@ -121,6 +134,7 @@ def evaluate_answer_quality(answer, documents):
         "score": score,
         "message": f"Answer quality score: {score}/100",
     }
+
 def evaluate_rouge(answer, documents):
     """
     Calculate ROUGE-L between the generated answer
