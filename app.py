@@ -79,6 +79,7 @@ if uploaded_files:
                     hallucination_evaluation = workflow_result["hallucination_evaluation"]
                     answer_quality_evaluation = workflow_result["answer_quality_evaluation"]
                     rouge_evaluation = workflow_result["rouge_evaluation"]
+                    bleu_evaluation = workflow_result["bleu_evaluation"]
                     st.write("### Agent Plan")
 
                     for step in plan["steps"]:
@@ -111,6 +112,9 @@ if uploaded_files:
                     st.write(
                          f"ROUGE: {rouge_evaluation['message']}"
    )
+                    st.write(
+                         f"BLEU: {bleu_evaluation['message']}"
+  )
                     st.write("### Retrieved Evidence")
 
                     for index, result in enumerate(documents, start=1):

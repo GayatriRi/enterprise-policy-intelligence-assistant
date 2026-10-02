@@ -1,4 +1,5 @@
 from rouge_score import rouge_scorer
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 def evaluate_retrieval(documents):
     """
     Basic retrieval evaluation.
@@ -152,4 +153,38 @@ def evaluate_rouge(answer, documents):
     return {
         "rouge_l": rouge_l,
         "message": f"ROUGE-L score: {rouge_l}",
+     }
+def evaluate_bleu(answer, documents):
+    """
+    Calculate BLEU score between the generated answer
+    and the retrieved document content.
+    """
+
+    if not answer or not documents:
+        return {
+            "bleu": 0.0,
+            "message": "BLEU score could not be calculated.",
+        }
+
+    reference_text = " ".join(
+        document.page_content
+        for document in documents
+    )
+
+    reference_tokens = reference_text.lower().split()
+    answer_tokens = answer.lower().split()
+
+    smoothing = SmoothingFunction().method1
+
+    bleu_score = sentence_bleu(
+        [reference_tokens],
+        answer_tokens,
+        smoothing_function=smoothing,
+    )
+
+    bleu_score = round(bleu_score, 3)
+
+    return {
+        "bleu": bleu_score,
+        "message": f"BLEU score: {bleu_score}",
     }
