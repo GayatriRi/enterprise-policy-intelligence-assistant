@@ -14,7 +14,7 @@ def retrieve_documents(vector_store, query, k=3):
     for document, score in results_with_scores:
         print("RETRIEVAL SCORE:", score)
 
-        if score >= 0.50:
+        if score >= 0.40:
             results.append(document)
 
     return results
