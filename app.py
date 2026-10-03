@@ -17,7 +17,13 @@ st.set_page_config(
 st.title("📚 Enterprise Policy Intelligence Assistant")
 
 st.write(
-    "A Generative AI and Agentic RAG application for querying enterprise documents."
+    "A Generative AI and Agentic RAG assistant for querying enterprise documents "
+    "with grounded answers, safety guardrails, and evaluation metrics."
+)
+
+st.info(
+    "How to use: Upload one or more supported documents, then ask a question "
+    "about their contents."
 )
 
 st.divider()
