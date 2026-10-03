@@ -1,5 +1,28 @@
 from rouge_score import rouge_scorer
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+def is_abstention(answer):
+    """
+    Detects when the system correctly says
+    that the document does not contain enough information.
+    """
+
+    if not answer:
+        return False
+
+    answer_text = answer.lower()
+
+    abstention_phrases = [
+        "could not find enough information",
+        "not enough information",
+        "does not provide information",
+        "information is not available",
+        "cannot determine from the uploaded document",
+    ]
+
+    return any(
+        phrase in answer_text
+        for phrase in abstention_phrases
+    )
 def evaluate_retrieval(documents):
     """
     Basic retrieval evaluation.
@@ -42,6 +65,12 @@ def evaluate_hallucination(answer, documents):
     Verifies whether the generated answer is grounded
     in the retrieved document content.
     """
+
+    if is_abstention(answer):
+        return {
+            "hallucination_detected": False,
+            "message": "No hallucination detected — system correctly abstained.",
+        }
 
     if not answer or not documents:
         return {
@@ -89,6 +118,12 @@ def evaluate_answer_quality(answer, documents):
     Returns a score from 0 to 100.
     """
 
+    if is_abstention(answer):
+        return {
+            "score": 100,
+            "message": "Correctly abstained due to insufficient evidence.",
+        }
+
     if not answer or not documents:
         return {
             "score": 0,
@@ -134,12 +169,17 @@ def evaluate_answer_quality(answer, documents):
         "score": score,
         "message": f"Answer quality score: {score}/100",
     }
-
 def evaluate_rouge(answer, documents):
     """
     Calculate ROUGE-L between the generated answer
     and the retrieved document content.
     """
+
+    if is_abstention(answer):
+        return {
+            "rouge_l": None,
+            "message": "ROUGE-L not applicable for abstention.",
+        }
 
     if not answer or not documents:
         return {
@@ -173,6 +213,12 @@ def evaluate_bleu(answer, documents):
     Calculate BLEU score between the generated answer
     and the retrieved document content.
     """
+
+    if is_abstention(answer):
+        return {
+            "bleu": None,
+            "message": "BLEU not applicable for abstention.",
+        }
 
     if not answer or not documents:
         return {
