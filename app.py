@@ -33,8 +33,8 @@ uploaded_files = st.file_uploader(
 if uploaded_files:
     st.success(f"{len(uploaded_files)} file(s) selected successfully.")
 
-    for uploaded_file in uploaded_files:
-        try:
+for uploaded_file in uploaded_files:
+     try:
             documents = load_document(uploaded_file)
             chunks = split_documents(documents)
             vector_store = build_vector_store(chunks)
@@ -58,75 +58,80 @@ if uploaded_files:
                 key=f"query_{uploaded_file.name}",
             )
 
-            if query:
-                guardrail_result = validate_query(query)
+            guardrail_result = validate_query(query)
 
-                if not guardrail_result["allowed"]:
-                    st.error(guardrail_result["message"])
+            if not guardrail_result["allowed"]:
+                st.error(guardrail_result["message"])
 
+            else:
+                workflow_result = run_agent_workflow(
+                    vector_store,
+                    query,
+                )
+
+                answer = workflow_result["answer"]
+                documents = workflow_result["documents"]
+                validation = workflow_result["validation"]
+                plan = workflow_result["plan"]
+                retrieval_evaluation = workflow_result["retrieval_evaluation"]
+                answer_evaluation = workflow_result["answer_evaluation"]
+                hallucination_evaluation = workflow_result["hallucination_evaluation"]
+                answer_quality_evaluation = workflow_result["answer_quality_evaluation"]
+                rouge_evaluation = workflow_result["rouge_evaluation"]
+                bleu_evaluation = workflow_result["bleu_evaluation"]
+
+                st.write("### Agent Plan")
+
+                for step in plan["steps"]:
+                    st.write(f"- {step}")
+
+                st.write("### AI Answer")
+                st.write(answer)
+
+                st.write("### Validation")
+
+                if validation["is_valid"]:
+                    st.success(validation["message"])
                 else:
-                    workflow_result = run_agent_workflow(
-                        vector_store,
-                        query,
-                    )
+                    st.error(validation["message"])
 
-                    answer = workflow_result["answer"]
-                    documents = workflow_result["documents"]
-                    validation = workflow_result["validation"]
-                    plan = workflow_result["plan"]
-                    retrieval_evaluation = workflow_result["retrieval_evaluation"]
-                    answer_evaluation = workflow_result["answer_evaluation"]
-                    hallucination_evaluation = workflow_result["hallucination_evaluation"]
-                    answer_quality_evaluation = workflow_result["answer_quality_evaluation"]
-                    rouge_evaluation = workflow_result["rouge_evaluation"]
-                    bleu_evaluation = workflow_result["bleu_evaluation"]
-                    st.write("### Agent Plan")
+                st.write("### Evaluation")
 
-                    for step in plan["steps"]:
-                        st.write(f"- {step}")
+                st.write(
+                    f"Retrieval: {retrieval_evaluation['message']}"
+                )
 
-                    st.write("### AI Answer")
-                    st.write(answer)
+                st.write(
+                    f"Answer: {answer_evaluation['message']}"
+                )
 
-                    st.write("### Validation")
+                st.write(
+                    f"Hallucination Check: {hallucination_evaluation['message']}"
+                )
 
-                    if validation["is_valid"]:
-                        st.success(validation["message"])
-                    else:
-                        st.error(validation["message"])
-                    st.write("### Evaluation")
+                st.write(
+                    f"Answer Quality: {answer_quality_evaluation['message']}"
+                )
 
-                    st.write(
-                         f"Retrieval: {retrieval_evaluation['message']}"
-                    )
+                st.write(
+                    f"ROUGE: {rouge_evaluation['message']}"
+                )
 
-                    st.write(
-                         f"Answer: {answer_evaluation['message']}"
-         )    
-                    st.write(
-                         f"Hallucination Check: {hallucination_evaluation['message']}"
-    )
-                    st.write(
-                         f"Answer Quality: {answer_quality_evaluation['message']}"
-         )
-                    st.write(
-                         f"ROUGE: {rouge_evaluation['message']}"
-   )
-                    st.write(
-                         f"BLEU: {bleu_evaluation['message']}"
-  )
-                    st.write("### Retrieved Evidence")
+                st.write(
+                    f"BLEU: {bleu_evaluation['message']}"
+                )
 
-                    for index, result in enumerate(documents, start=1):
-                        with st.expander(f"Result {index}"):
-                            st.write(result.page_content)
+                st.write("### Retrieved Evidence")
 
-        except Exception as error:
+                for index, result in enumerate(documents, start=1):
+                    with st.expander(f"Result {index}"):
+                        st.write(result.page_content)
+
+     except Exception as error:
             st.error(
                 f"Could not process {uploaded_file.name}: {error}"
             )
-
-else:
+if not uploaded_files:
     st.info(
         "Upload one or more enterprise documents to begin."
     )
