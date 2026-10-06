@@ -104,7 +104,7 @@ for uploaded_file in uploaded_files:
                 st.write("### Evaluation")
 
                 st.write(
-                    f"Retrieval: {retrieval_evaluation['message']}"
+                    f"Retrieval status/count: {retrieval_evaluation['message']}"
                 )
 
                 st.write(
@@ -112,19 +112,19 @@ for uploaded_file in uploaded_files:
                 )
 
                 st.write(
-                    f"Hallucination Check: {hallucination_evaluation['message']}"
+                    f"Evidence support: {hallucination_evaluation['message']}"
                 )
 
                 st.write(
-                    f"Answer Quality: {answer_quality_evaluation['message']}"
+                    f"Binary support-check result: {answer_quality_evaluation['message']}"
                 )
 
                 st.write(
-                    f"ROUGE: {rouge_evaluation['message']}"
+                    rouge_evaluation["message"]
                 )
 
                 st.write(
-                    f"BLEU: {bleu_evaluation['message']}"
+                    bleu_evaluation["message"]
                 )
 
                 st.write("### Retrieved Evidence")
