@@ -10,8 +10,7 @@ FAISS_INDEX_PATH = Path("vector_store/faiss_index")
 
 def build_vector_store(chunks):
     """
-    Build a FAISS vector store from document chunks
-    and save it locally.
+    Build an in-memory FAISS vector store from document chunks.
     """
 
     embeddings = get_embeddings()
@@ -19,15 +18,6 @@ def build_vector_store(chunks):
     vector_store = FAISS.from_documents(
         documents=chunks,
         embedding=embeddings,
-    )
-
-    FAISS_INDEX_PATH.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    vector_store.save_local(
-        str(FAISS_INDEX_PATH)
     )
 
     return vector_store
