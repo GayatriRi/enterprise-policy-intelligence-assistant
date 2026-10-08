@@ -22,7 +22,12 @@ def _normalize(text):
     text = re.sub(r"\bcannot\b", "can not", text)
     text = re.sub(r"\b(\w+)n't\b", r"\1 not", text)
     # Preserve line boundaries for bullet and claim splitting.
-    return "\n".join(" ".join(line.split()) for line in text.splitlines())
+    text = "\n".join(" ".join(line.split()) for line in text.splitlines())
+    return re.sub(
+        r"^(?:the|this)\s+(?:policy|document|evidence)\s+(?=(?:allows|permits)\b)",
+        "",
+        text,
+    )
 
 
 def _tokens(text):
@@ -52,6 +57,73 @@ def _negation_scopes(tokens):
         for index, token in enumerate(tokens)
         if token in _NEGATIONS
     ]
+
+
+def _normalize_quantitative_framing(clause, candidate_clause, tokens, candidate):
+    """Simplify a bounded monetary framing only after proving it in one clause.
+
+    None means a recognized framing was unsupported. Other constructions,
+    including negative ones, retain their original tokens and checks.
+    """
+    if _negation_scopes(tokens) or _negation_scopes(candidate):
+        return tokens
+
+    framing = re.fullmatch(r"(?:the|this)\s+(.+?)\s+is\s+(.+)", clause)
+    if not framing:
+        return tokens
+    head = re.fullmatch(
+        r"(?P<maximum>maximum\s+)?(?P<daily>daily\s+)?"
+        r"(?P<modifiers>(?:[^\W\d_]+\s+){0,6})"
+        r"(?:reimbursement|allowance)(?:\s+(?P<quantity>amount|limit))?",
+        framing[1],
+    )
+    if not head:
+        return tokens
+    body = _tokens(framing[2])
+    if not body or not _NUMBER.fullmatch(body[0]) or body[0][0] not in "$\u20ac\u00a3":
+        # Nonmonetary allowances retain the existing generic validation path.
+        return tokens
+
+    # Require an explicit monetary entitlement, not just a nearby amount.
+    entitlement = re.fullmatch(
+        r".+?\s+(?:(?:may|can|are allowed to|are entitled to)\s+(?:claim|receive)"
+        r"|(?:are|can be|may be)\s+reimbursed)\s+"
+        r"(?:(?P<bound>up to|at most)\s+)?(?P<body>.+)",
+        candidate_clause,
+    )
+    if not entitlement:
+        # An identical nominal construction needs no semantic simplification.
+        return tokens if clause == candidate_clause else None
+    evidence_body = _tokens(entitlement["body"])
+    # Preserve every amount, unit, purpose and context token in order. This is
+    # deliberately stricter than overlap before removing any framing words.
+    if body != evidence_body:
+        return None
+    if (head["maximum"] or head["quantity"] == "limit") and not entitlement["bound"]:
+        return None
+    if head["daily"] and not (
+        re.search(r"\bper day\b", framing[2])
+        and re.search(r"\bper day\b", entitlement["body"])
+    ):
+        return None
+
+    # Only framing modifiers get this bounded regular-plural comparison.
+    # They must all be supported; no unmatched-modifier allowance is used.
+    modifiers = []
+    for modifier in _tokens(head["modifiers"]):
+        equivalent = next(
+            (
+                word for word in candidate
+                if modifier == word
+                or (len(modifier) > 3 and modifier + "s" == word)
+                or (len(word) > 3 and word + "s" == modifier)
+            ),
+            None,
+        )
+        if equivalent is None:
+            return None
+        modifiers.append(equivalent)
+    return modifiers + body
 
 
 def _supported(claim, candidate):
@@ -93,10 +165,10 @@ def validate_answer(answer, documents):
         }
 
     evidence_candidates = [
-        tokens
+        (clause, tokens)
         for document in (documents or [])
         if document.page_content and document.page_content.strip()
-        for _, tokens in _claims(document.page_content)
+        for clause, tokens in _claims(document.page_content)
     ]
 
     if not evidence_candidates:
@@ -113,7 +185,15 @@ def validate_answer(answer, documents):
         }
 
     for clause, tokens in claims:
-        if not any(_supported(tokens, candidate) for candidate in evidence_candidates):
+        supported = False
+        for candidate_clause, candidate in evidence_candidates:
+            normalized = _normalize_quantitative_framing(
+                clause, candidate_clause, tokens, candidate
+            )
+            if normalized is not None and _supported(normalized, candidate):
+                supported = True
+                break
+        if not supported:
             return {
                 "is_valid": False,
                 "message": f"Claim could not be verified against retrieved evidence: {clause}",
