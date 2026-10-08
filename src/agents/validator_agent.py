@@ -13,6 +13,28 @@ _TOKEN = re.compile(r"[$€£]?[+-]?\d+(?:,\d{3})*(?:\.\d+)?%?|[^\W\d_]+", re.UN
 _CLAUSE_BREAK = re.compile(
     r"(?<!\d)[.!?]|[.!?](?!\d)|[;\n•]|\b(?:and|but|or|however|although|whereas)\b"
 )
+_PARAPHRASE_SUPPORT = {
+    "get": {"receive", "receives"},
+    "can": {"may", "allowed", "allows", "permits"},
+    "allowed": {"may", "can", "allows", "permits"},
+    "allows": {"may", "can", "allowed", "permits"},
+    "permits": {"may", "can", "allowed", "allows"},
+    "entitled": {"receive", "receives"},
+    "allowance": {"receive", "receives", "entitled"},
+}
+_OPPOSITE_MODIFIERS = (
+    ("paid", "unpaid"), ("required", "optional"),
+    ("allowed", "prohibited"), ("permitted", "forbidden"),
+)
+_DIRECTIONAL_VERBS = {
+    "pay": "pay", "pays": "pay", "send": "send", "sends": "send",
+    "transfer": "transfer", "transfers": "transfer",
+    "assign": "assign", "assigns": "assign",
+}
+_RELATION_MODALS = {
+    "must", "should", "shall", "may", "can", "will", "would", "could", "might",
+}
+_RELATION_AUXILIARIES = _RELATION_MODALS | {"allowed", "entitled"}
 
 
 def _normalize(text):
@@ -126,6 +148,73 @@ def _normalize_quantitative_framing(clause, candidate_clause, tokens, candidate)
     return modifiers + body
 
 
+def _lexically_consistent(claim_words, candidate_words):
+    """Allow only bounded paraphrases backed by this evidence candidate."""
+    unmatched = claim_words - candidate_words
+    for first, second in _OPPOSITE_MODIFIERS:
+        if (
+            (first in unmatched and second in candidate_words)
+            or (second in unmatched and first in candidate_words)
+        ):
+            return False
+    return all(
+        word in _PARAPHRASE_SUPPORT
+        and _PARAPHRASE_SUPPORT[word] & candidate_words
+        for word in unmatched
+    )
+
+
+def _directional_signatures(tokens, verbs):
+    """Extract local actor/action/object signatures, not global word order."""
+    def participant(words):
+        return next(
+            (
+                word for word in words
+                if word not in _RELATION_AUXILIARIES
+                and word not in _NEGATIONS
+                and not _NUMBER.fullmatch(word)
+            ),
+            None,
+        )
+
+    signatures = []
+    for index, word in enumerate(tokens):
+        if word not in _DIRECTIONAL_VERBS or _DIRECTIONAL_VERBS[word] not in verbs:
+            continue
+        actor = participant(reversed(tokens[:index]))
+        target = participant(tokens[index + 1:])
+        signatures.append((actor, _DIRECTIONAL_VERBS[word], target))
+    return signatures
+
+
+def _directional_relationships_match(claim, candidate):
+    # A modal immediately before a directional verb identifies a bounded
+    # active construction. The corresponding statement may omit the modal.
+    verbs = {
+        _DIRECTIONAL_VERBS[word]
+        for tokens in (claim, candidate)
+        for index, word in enumerate(tokens)
+        if word in _DIRECTIONAL_VERBS and index > 0
+        and tokens[index - 1] in _RELATION_MODALS
+    }
+    # Without that cue, reject clear reversals without interpreting every
+    # noun occurrence (such as "transfer") as an active-voice construction.
+    all_verbs = set(_DIRECTIONAL_VERBS.values())
+    all_available = _directional_signatures(candidate, all_verbs)
+    for actor, verb, target in _directional_signatures(claim, all_verbs):
+        if (
+            actor is not None and target is not None and actor != target
+            and (actor, verb, target) not in all_available
+            and (target, verb, actor) in all_available
+        ):
+            return False
+    available = _directional_signatures(candidate, verbs)
+    return all(
+        signature in available
+        for signature in _directional_signatures(claim, verbs)
+    )
+
+
 def _supported(claim, candidate):
     claim_words, candidate_words = set(claim), set(candidate)
     unmatched = claim_words - candidate_words
@@ -149,7 +238,11 @@ def _supported(claim, candidate):
             return False
 
     # Exact local scopes deliberately reject ambiguous negative paraphrases.
-    return _negation_scopes(claim) == _negation_scopes(candidate)
+    return (
+        _negation_scopes(claim) == _negation_scopes(candidate)
+        and _lexically_consistent(claim_words, candidate_words)
+        and _directional_relationships_match(claim, candidate)
+    )
 
 
 def validate_answer(answer, documents):
