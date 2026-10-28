@@ -87,6 +87,15 @@ The application supports:
 
 The planner returns fixed steps; this is a deterministic agent-style pipeline without autonomous replanning. Embeddings use `sentence-transformers/all-MiniLM-L6-v2` locally. Each uploaded file has its own in-memory FAISS object in Streamlit session state; the application does not save or load persisted indexes.
 
+| Agent | Role in the fixed workflow |
+|---|---|
+| Planner | Return the question and predefined retrieve, reason, and validate steps. |
+| Retriever | Search the current file's FAISS index for up to three chunks and retain only those with relevance scores of at least `0.30`. |
+| Reasoner | Pass the question and retrieved evidence to the guarded Groq generation function for a grounded answer or prompted abstention. |
+| Validator | Check each generated claim against retrieved evidence using deterministic lexical, quantitative, negation, and bounded relationship checks. |
+
+Retrieval scores are similarity-based filtering signals, not probabilities of relevance or answer correctness. RAG uses the retained chunks as generation context; it does not train or fine-tune the model on uploaded documents.
+
 ## Application Workflow
 
 ```text
@@ -143,6 +152,10 @@ GROQ_MODEL=llama-3.1-8b-instant
 
 The real `.env` must never be committed or included in the submission. `.env.example` is the shareable template. Groq is the implemented generation provider; Gemini is not integrated.
 
+### Local Deployment and Run
+
+The evaluated implementation runs locally as a Streamlit application. No hosted/cloud deployment is required or configured in this repository. An evaluator can reproduce the application locally by following the Setup and Configuration instructions above and launching it with the command below. Local execution still requires Groq connectivity for answer generation.
+
 Launch the application from the project root:
 
 ```powershell
@@ -196,6 +209,16 @@ Standalone abstention is reported as **"Abstention detected; correctness not ass
 - Answers that fail validation are still displayed with a warning rather than automatically replaced.
 - No-evidence submissions still reach generation; abstention depends on the model following its instructions.
 
+## Development Challenges and Solutions
+
+- **Multi-format document ingestion:** PDF, TXT, CSV, XLS, and XLSX required different parsing methods while the downstream pipeline needed a common input. Format-specific loaders convert extracted text and tables into LangChain `Document` objects with source metadata. PDF pages and Excel sheets retain their page or sheet identifiers, and the shared chunker processes the resulting documents. Scanned PDFs still require external OCR.
+- **Retrieval relevance:** Similarity search could return chunks even for unrelated questions. A relevance threshold of `0.30` was introduced and tested so that only qualifying results from the top three candidates enter the generation context. This reduces irrelevant context but cannot guarantee relevance. If no chunks qualify, the generation prompt requests abstention; generation is still invoked, so this behavior depends on the model following its instructions.
+- **FAISS persistence and security:** Earlier local persistence introduced shared-index and unsafe pickle-deserialization concerns. The final design builds an in-memory FAISS index for each uploaded file and stores it only in the current Streamlit session. The dangerous persisted-index loading path was removed; the application does not load saved FAISS indexes or use stale local index artifacts.
+- **Prompt injection:** Initial substring checks produced both false positives and false negatives. Screening was refined with Unicode and whitespace normalization, broader deterministic patterns, and bounded exceptions for ordinary policy discussion. Retrieved content is screened as well as the question, and generation rechecks both before invoking Groq. Separate `SystemMessage` and `HumanMessage` objects keep fixed instructions separate from JSON-serialized, untrusted question/evidence fields. These measures reduce risk but do not provide perfect prompt-injection resistance.
+- **Answer validation:** Simple lexical overlap could reject supported paraphrases or accept contradictory statements. The validator was incrementally improved with quantitative framing normalization, numeric and local unit checks, negation checks, selected opposite-modifier checks, evidence-conditioned paraphrase handling, and bounded actor/action/object relationship checks. These deterministic checks address tested cases but do not establish complete semantic truth; supported paraphrases can still fail and unsupported meanings can still pass.
+- **Streamlit reruns and session state:** Routine reruns could repeat document parsing, embedding, indexing, and generation unnecessarily. Session State tracks uploads by filename and content hash so unchanged uploads reuse their processed state during the session. Per-file Ask forms submit questions explicitly, and saved results are reused on ordinary reruns. Selecting Ask again intentionally reruns the workflow; a session reset requires indexes to be rebuilt.
+- **Evaluation interpretation:** ROUGE-L and BLEU measure lexical overlap with retrieved context, so presenting them as factual-correctness scores would be misleading. Evaluation messages distinguish retrieval availability, answer presence, heuristic evidence support, and lexical diagnostics. The binary support indicator reports a deterministic check result rather than a probability or overall quality score, and standalone abstention is marked as not assessed. Passing evidence-support validation does not guarantee semantic correctness.
+
 ## Reproducibility and Submission
 
 - `requirements.txt` is currently unpinned, so exact dependency reproduction is not guaranteed. Record the installed versions used for your final demonstration.
@@ -203,4 +226,4 @@ Standalone abstention is reported as **"Abstention detected; correctness not ass
 - Groq connectivity and a valid local API key are required for generation. The question and retrieved document text are sent to Groq.
 - Commit/share source files, `requirements.txt`, `.env.example`, and sample documents. Never commit or submit the real `.env` or API keys.
 - Exclude `.env`, `.venv`, `.git`, `__pycache__`, and stale/generated `vector_store` artifacts from the submission ZIP. `.gitignore` does not automatically exclude them from a manually created ZIP.
-- Keep the final submission package under **25 MB**; dependencies and model caches should not be bundled.
+- Submit the complete source code and documentation in **one ZIP file** under the portal's **20 MB** limit; dependencies and model caches should not be bundled.
